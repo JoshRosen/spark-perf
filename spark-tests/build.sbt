@@ -8,7 +8,9 @@ organization := "org.spark-project"
 
 scalaVersion := "2.10.3"
 
-libraryDependencies += "net.sf.jopt-simple" % "jopt-simple" % "4.5"
+libraryDependencies += "net.sf.jopt-simple" % "jopt-simple" % "4.6"
+
+libraryDependencies += "org.json4s" %% "json4s-native" % "3.2.9"
 
 libraryDependencies += "org.scalatest" % "scalatest_2.10" % "1.9.1" % "test"
 

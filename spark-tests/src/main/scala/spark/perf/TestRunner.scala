@@ -2,6 +2,9 @@ package spark.perf
 
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
 
 object TestRunner {
   def main(args: Array[String]) {
@@ -27,7 +30,8 @@ object TestRunner {
     }
     test.initialize(perfTestArgs)
     test.createInputData()
-    val results: Seq[Double] = test.run()
-    println("results: " + results.map(r => "%.3f".format(r)).mkString(","))
+    val (options, results) = test.run()
+    val json: JValue = ("options" -> options) ~ ("results" -> results)
+    println("results: " + compact(render(json)))
   }
 }
