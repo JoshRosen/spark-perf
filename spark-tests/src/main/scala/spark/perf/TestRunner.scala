@@ -1,5 +1,7 @@
 package spark.perf
 
+import scala.collection.JavaConverters._
+
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 import org.json4s._
@@ -31,7 +33,12 @@ object TestRunner {
     test.initialize(perfTestArgs)
     test.createInputData()
     val (options, results) = test.run()
-    val json: JValue = ("options" -> options) ~ ("results" -> results)
+    val json: JValue =
+      ("options" -> options) ~
+      ("sparkConf" -> sc.getConf.getAll.toMap) ~
+      ("sparkVersion" -> sc.version) ~
+      ("systemProperties" -> System.getProperties.asScala.toMap) ~
+      ("results" -> results)
     println("results: " + compact(render(json)))
   }
 }
