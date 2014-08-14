@@ -10,9 +10,11 @@ class Cluster(object):
     Functionality for interacting with a Spark cluster.
     """
 
-    def __init__(self, spark_home, spark_conf_dir=None):
+    def __init__(self, spark_home, url, driver_memory, spark_conf_dir=None):
         self.spark_home = spark_home
         self.spark_conf_dir = spark_conf_dir or "%s/conf" % spark_home
+        self.url = url
+        self.driver_memory = driver_memory
 
         # Get a list of slaves by parsing the slaves file in SPARK_CONF_DIR.
         slaves_file_raw = open("%s/slaves" % self.spark_conf_dir, 'r').read().split("\n")

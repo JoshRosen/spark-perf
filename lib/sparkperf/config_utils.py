@@ -52,3 +52,25 @@ class ConstantOption:
         self.name = name
     def to_array(self, scale_factor = 1.0):
         return [self.name]
+
+
+def java_opt_to_flags(java_opts):
+    """
+    Convert a dictionary of Java options into JVM command-line flags.
+
+    >>> java_opt_to_flags({"spark.storage.memoryFraction": 0.66})
+    ['-Dspark.storage.memoryFraction=0.66']
+    """
+    return ["-D%s=%s" % (name, val) for (name, val) in java_opts.items()]
+
+
+def test_opt_to_flags(test_opts):
+    """
+    Convert a dictionary of test options into command-line flags.
+
+    >>> test_opt_to_flags({'test-name': 'agg_by_key', 'num-partitions': 100})
+    ['agg_by_key', '--num-partitions 100']
+    """
+    assert "test-name" in test_opts
+    flags = ["--%s %s" % (name, val) for (name, val) in test_opts.items() if name != "test-name"]
+    return [test_opts['test-name']] + flags

@@ -31,10 +31,10 @@ class TestPlan(object):
                     t_dict = dict(test_opt_list)
                     yield {
                         'name': name,
-                        'test_suite': test_suite,
-                        'test_script': test_script,
-                        'java_opts': j_dict,
-                        'test_opts': t_dict,
+                        'test-suite': test_suite,
+                        'test-script': test_script,
+                        'java-opts': j_dict,
+                        'test-opts': t_dict,
                     }
         new_tests = list(enumerate_options())
         self.tests.extend(new_tests)

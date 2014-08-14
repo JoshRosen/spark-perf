@@ -9,6 +9,7 @@ from sparkperf.cluster import Cluster
 from sparkperf.testsuites import *
 from sparkperf.build_spark import build_spark
 from sparkperf.test_plan import TestPlan
+from sparkperf.test_runner import TestRunner
 
 
 parser = argparse.ArgumentParser(description='Run Spark or Shark peformance tests. Before running, '
@@ -35,103 +36,16 @@ plan = config.plan
 from pprint import pprint
 print len(plan.tests)
 pprint(plan.tests)
-exit()
-
-# Spark will always be built, assuming that any possible test run of this program is going to depend
-# on Spark.
-has_spark_tests = (len(config.SPARK_TESTS) > 0)
-should_prep_spark = (not config.SPARK_SKIP_PREP) and (not config.USE_CLUSTER_SPARK)
-
-# Since Spark is always going to prepared, streaming and mllib do not require extra preparation
-has_streaming_tests = (len(config.STREAMING_TESTS) > 0)
-has_mllib_tests = (len(config.MLLIB_TESTS) > 0)
-# Only build the perf test sources that will be used.
-should_prep_spark_tests = has_spark_tests and not config.SPARK_SKIP_TEST_PREP
-should_prep_streaming_tests = has_streaming_tests and not config.STREAMING_SKIP_TEST_PREP
-should_prep_mllib_tests = has_mllib_tests and not config.MLLIB_SKIP_TEST_PREP
-
-# Do disk warmup only if there are tests to run.
-should_warmup_disk = has_spark_tests and not config.SKIP_DISK_WARMUP
-
-# Check that commit ID's are specified in config_file.
-if should_prep_spark:
-    assert config.SPARK_COMMIT_ID is not "", \
-        ("Please specify SPARK_COMMIT_ID in %s" % args.config_file)
-
-# If a cluster is already running from the Spark EC2 scripts, try shutting it down.
-if os.path.exists(config.SPARK_HOME_DIR):
-    Cluster(spark_home=config.SPARK_HOME_DIR).stop()
+runner = TestRunner()
 
 if config.USE_CLUSTER_SPARK:
-    cluster = Cluster(spark_home=config.SPARK_HOME_DIR, spark_conf_dir=config.SPARK_CONF_DIR)
+    cluster = Cluster(spark_home=config.SPARK_HOME_DIR, url=config.SPARK_CLUSTER_URL,
+                      driver_memory=config.SPARK_DRIVER_MEMORY, spark_conf_dir=config.SPARK_CONF_DIR)
 else:
-    cluster = Cluster(spark_home="%s/spark" % PROJ_DIR, spark_conf_dir=config.SPARK_CONF_DIR)
+    cluster = Cluster(spark_home=config.SPARK_HOME_DIR, url=config.SPARK_CLUSTER_URL,
+                      driver_memory=config.SPARK_DRIVER_MEMORY, spark_conf_dir=config.SPARK_CONF_DIR)
+runner.run(plan, config, cluster)
 
-# If a cluster is already running from an earlier test, try shutting it down.
-if os.path.exists(cluster.spark_home):
-    cluster.stop()
-
-# Ensure all shutdowns have completed (no executors are running).
-cluster.ensure_spark_stopped_on_slaves()
-# Allow some extra time for slaves to fully terminate.
-time.sleep(5)
-
-# Prepare Spark.
-if should_prep_spark:
-    build_spark(config.SPARK_COMMIT_ID, PROJ_DIR + "/spark", config.SPARK_CONF_DIR,
-                config.SPARK_MERGE_COMMIT_INTO_MASTER, config.SPARK_GIT_REPO)
-
-# Build the tests for each project.
-spark_work_dir = "%s/work" % cluster.spark_home
-if os.path.exists(spark_work_dir):
-    # Clear the 'perf-tests/spark/work' directory beforehand, since that may contain scheduler logs
-    # from previous jobs. The directory could also contain a spark-perf-tests-assembly.jar that may
-    # interfere with subsequent 'sbt assembly' for Spark perf.
-    clear_dir(spark_work_dir, ["localhost"], config.PROMPT_FOR_DELETES)
-
-print("Building perf tests...")
-if should_prep_spark_tests:
-    SparkTests.build()
-elif has_spark_tests:
-    assert SparkTests.is_built(), ("You tried to skip packaging the Spark perf " +
-        "tests, but %s was not already present") % SparkTests.test_jar_path
-
-if should_prep_streaming_tests:
-    StreamingTests.build()
-elif has_streaming_tests:
-    assert StreamingTests.is_built(), ("You tried to skip packaging the Spark Streaming perf " +
-        "tests, but %s was not already present") % StreamingTests.test_jar_path
-
-if should_prep_mllib_tests:
-    MLlibTests.build()
-elif has_mllib_tests:
-    assert MLlibTests.is_built(), ("You tried to skip packaging the MLlib perf " +
-        "tests, but %s was not already present") % MLlibTests.test_jar_path
-
-# Start our Spark cluster.
-print("Starting a Spark standalone cluster to use for testing...")
-cluster.sync_spark()
-cluster.start()
-time.sleep(5) # Starting the cluster takes a little time so give it a second.
-
-if should_warmup_disk:
-    cluster.warmup_disks(config.DISK_WARMUP_BYTES, config.DISK_WARMUP_FILES)
-
-if has_spark_tests:
-    SparkTests.run_tests(cluster, config, config.SPARK_TESTS, "Spark-Tests",
-                         config.SPARK_OUTPUT_FILENAME)
-
-if config.PYSPARK_TESTS:
-    PythonTests.run_tests(cluster, config, config.PYSPARK_TESTS, "PySpark-Tests",
-                          config.PYSPARK_OUTPUT_FILENAME)
-
-if has_streaming_tests:
-    StreamingTests.run_tests(cluster, config, config.STREAMING_TESTS, "Streaming-Tests",
-                             config.STREAMING_OUTPUT_FILENAME)
-
-if has_mllib_tests:
-    MLlibTests.run_tests(cluster, config, config.MLLIB_TESTS, "MLlib-Tests",
-                         config.MLLIB_OUTPUT_FILENAME)
 
 print("All tests have finished running. Stopping Spark standalone cluster ...")
 cluster.stop()

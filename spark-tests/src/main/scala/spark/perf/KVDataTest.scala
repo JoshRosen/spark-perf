@@ -46,7 +46,7 @@ abstract class KVDataTest(sc: SparkContext, dataType: String = "string") extends
     parser.accepts(opt, desc).withRequiredArg().ofType(classOf[String]).required()
   }
   booleanOptions.map{case (opt, desc) =>
-    parser.accepts(opt, desc)
+    parser.accepts(opt, desc).withRequiredArg().ofType(classOf[String]).required()
   }
 
   var waitForExit = false
@@ -54,8 +54,8 @@ abstract class KVDataTest(sc: SparkContext, dataType: String = "string") extends
 
   override def initialize(args: Array[String]) = {
     optionSet = parser.parse(args.toSeq: _*)
-    waitForExit = optionSet.has(WAIT_FOR_EXIT._1)
-    hashRecords = optionSet.has(HASH_RECORDS._1)
+    waitForExit = optionSet.valueOf(WAIT_FOR_EXIT._1).asInstanceOf[String].toLowerCase == "true"
+    hashRecords = optionSet.valueOf(HASH_RECORDS._1).asInstanceOf[String].toLowerCase == "true"
   }
 
   override def createInputData() = {
