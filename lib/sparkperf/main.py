@@ -8,6 +8,7 @@ from sparkperf.commands import *
 from sparkperf.cluster import Cluster
 from sparkperf.testsuites import *
 from sparkperf.build_spark import build_spark
+from sparkperf.test_plan import TestPlan
 
 
 parser = argparse.ArgumentParser(description='Run Spark or Shark peformance tests. Before running, '
@@ -29,6 +30,13 @@ print "Detected project directory: %s" % PROJ_DIR
 print "Loading configuration from %s" % args.config_file
 with open(args.config_file) as cf:
     config = imp.load_source("config", "", cf)
+
+plan = TestPlan()
+plan.add_from_config(SparkTests, config.SPARK_TESTS)
+from pprint import pprint
+print len(plan.tests)
+pprint(plan.tests)
+exit()
 
 # Spark will always be built, assuming that any possible test run of this program is going to depend
 # on Spark.
