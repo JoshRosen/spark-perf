@@ -7,6 +7,7 @@ import time
 from sparkperf.commands import *
 from sparkperf.cluster import Cluster
 from sparkperf.testsuites import *
+from sparkperf.build_spark import build_spark
 
 
 parser = argparse.ArgumentParser(description='Run Spark or Shark peformance tests. Before running, '
@@ -70,54 +71,8 @@ time.sleep(5)
 
 # Prepare Spark.
 if should_prep_spark:
-    # Assumes that the preexisting 'spark' directory is valid.
-    if not os.path.isdir("spark"):
-        # Clone Spark.
-        print("Git cloning Spark...")
-        run_cmd("git clone %s spark" % config.SPARK_GIT_REPO)
-        run_cmd("cd spark; git config --add remote.origin.fetch "
-            "'+refs/pull/*/head:refs/remotes/origin/pr/*'")
-        run_cmd("cd spark; git config --add remote.origin.fetch "
-            "'+refs/tags/*:refs/remotes/origin/tag/*'")
-
-    # Fetch updates.
-    os.chdir("spark")
-    print("Updating Spark repo...")
-    run_cmd("git fetch")
-
-    # Build Spark.
-    print("Cleaning Spark and building branch %s. This may take a while...\n" %
-        config.SPARK_COMMIT_ID)
-    run_cmd("git clean -f -d -x")
-
-    if config.SPARK_MERGE_COMMIT_INTO_MASTER:
-        run_cmd("git reset --hard master")
-        run_cmd("git merge %s -m ='Merging %s into master.'" %
-            (config.SPARK_COMMIT_ID, config.SPARK_COMMIT_ID))
-    else:
-        run_cmd("git reset --hard %s" % config.SPARK_COMMIT_ID)
-
-    run_cmd("%s clean assembly/assembly" % SBT_CMD)
-
-    # Copy Spark configuration files to new directory.
-    print("Copying all files from %s to %s/spark/conf/" % (config.SPARK_CONF_DIR, PROJ_DIR))
-    assert os.path.exists("%s/spark-env.sh" % config.SPARK_CONF_DIR), \
-        "Could not find required file %s/spark-env.sh" % config.SPARK_CONF_DIR
-    assert os.path.exists("%s/slaves" % config.SPARK_CONF_DIR), \
-        "Could not find required file %s/slaves" % config.SPARK_CONF_DIR
-    run_cmd("cp %s/* %s/spark/conf/" % (config.SPARK_CONF_DIR, PROJ_DIR))
-
-    # Change back to 'PROJ_DIR' directory.
-    os.chdir("..")
-
-    # Sync the whole directory to the slaves.
-    print("Syncing Spark directory to the slaves.")
-
-    make_PROJ_DIR = [(make_ssh_cmd("mkdir -p %s" % PROJ_DIR , s), True) for s in cluster.slaves]
-    run_cmds_parallel(make_PROJ_DIR)
- 
-    copy_spark = [(make_rsync_cmd("%s/spark" % PROJ_DIR , s), True) for s in cluster.slaves]
-    run_cmds_parallel(copy_spark)
+    build_spark(config.SPARK_COMMIT_ID, PROJ_DIR + "/spark", config.SPARK_CONF_DIR,
+                config.SPARK_MERGE_COMMIT_INTO_MASTER, config.SPARK_GIT_REPO)
 
 # Build the tests for each project.
 spark_work_dir = "%s/work" % cluster.spark_home
@@ -148,6 +103,7 @@ elif has_mllib_tests:
 
 # Start our Spark cluster.
 print("Starting a Spark standalone cluster to use for testing...")
+cluster.sync_spark()
 cluster.start()
 time.sleep(5) # Starting the cluster takes a little time so give it a second.
 
