@@ -32,11 +32,11 @@ class PerfTestSuite(object):
         raise NotImplementedError
 
     @classmethod
-    def run_tests(cls, cluster, config, tests_to_run, test_group_name, output_filename):
+    def run_tests(cls, cluster, test_dict, output_filename):
         """
-        Run a set of tests from this performance suite.
+        Run an individual test from this performance suite.
 
-        :param cluster:  The L{Cluster} to run the tests on.
+        :param cluster:  The L{Cluster} to run the test on.
         :param tests_to_run:  A list of 5-tuple elements specifying the tests to run.  See the
                              'Test Setup' section in config.py.template for more info.
         :param test_group_name:  A short string identifier for this test run.
@@ -45,10 +45,9 @@ class PerfTestSuite(object):
         output_dirname = output_filename + "_logs"
         os.makedirs(output_dirname)
         out_file = open(output_filename, 'w')
-        num_tests_to_run = len(tests_to_run)
 
         print(OUTPUT_DIVIDER_STRING)
-        print("Running %d tests in %s.\n" % (num_tests_to_run, test_group_name))
+        #print("Running %d tests in %s.\n" % (num_tests_to_run, test_group_name))
         failed_tests = []
 
         for short_name, main_class_or_script, scale_factor, java_opt_sets, opt_sets in tests_to_run:

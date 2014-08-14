@@ -31,8 +31,7 @@ print "Loading configuration from %s" % args.config_file
 with open(args.config_file) as cf:
     config = imp.load_source("config", "", cf)
 
-plan = TestPlan()
-plan.add_from_config(SparkTests, config.SPARK_TESTS)
+plan = config.plan
 from pprint import pprint
 print len(plan.tests)
 pprint(plan.tests)
