@@ -1,4 +1,5 @@
 import time
+import os
 
 
 class TestRunner(object):
@@ -6,6 +7,8 @@ class TestRunner(object):
         pass
 
     def run(self, plan, config, cluster, results_dir):
+        if not os.path.isdir(results_dir):
+            os.makedirs(results_dir)
         # A cluster might be running from an earlier test, so try shutting it down:
         cluster.stop()
         # Ensure all shutdowns have completed (no executors are running).

@@ -26,7 +26,7 @@ USE_CLUSTER_SPARK = True
 
 ############## If not using existing Spark installation  ############
 # Commit id and repo used if you are not using an existing Spark cluster
-# custom version of Spark. The remote name in your git repo is assumed 
+# custom version of Spark. The remote name in your git repo is assumed
 # to be "origin". 
 #
 # The commit ID can specify any of the following:
@@ -34,9 +34,10 @@ USE_CLUSTER_SPARK = True
 #     2. A branch name             e.g. "origin/branch-0.7"
 #     3. A tag name                e.g. "origin/tag/v0.8.0-incubating"
 #     4. A pull request            e.g. "origin/pr/675"
-SPARK_COMMIT_ID = ""
+SPARK_COMMIT_IDS = [
+    'origin/master'
+]
 SPARK_GIT_REPO = "https://github.com/apache/spark.git"
-SPARK_MERGE_COMMIT_INTO_MASTER = False # Whether to merge the commit into master
 #####################################################################
 
 # File to write results to.
