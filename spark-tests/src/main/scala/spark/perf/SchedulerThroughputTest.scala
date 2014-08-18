@@ -1,6 +1,5 @@
 package spark.perf
 
-import scala.collection.JavaConverters._
 import joptsimple.{OptionSet, OptionParser}
 
 import org.apache.spark.SparkContext
@@ -25,20 +24,12 @@ class SchedulerThroughputTest(sc: SparkContext) extends PerfTest {
 
   def createInputData() = {}
 
-  def run: (JValue, Seq[JValue]) = {
+  def run: Seq[JValue] = {
     val numTrials = optionSet.valueOf(NUM_TRIALS._1).asInstanceOf[Int]
     val interTrialWait = optionSet.valueOf(INTER_TRIAL_WAIT._1).asInstanceOf[Int]
     val numTasks = optionSet.valueOf(NUM_TASKS._1).asInstanceOf[Int]
 
-    val options: Map[String, String] = optionSet.asMap().asScala.flatMap { case (spec, values) =>
-      if (spec.options().size() == 1 && values.size() == 1) {
-        Some((spec.options().iterator().next(), values.iterator().next().toString))
-      } else {
-        None
-      }
-    }.toMap
-
-    val results: Seq[JValue] = (1 to numTrials).map { t =>
+    val results: Seq[JValue] = (1 to numTrials).view.map { t =>
       val start = System.currentTimeMillis()
       sc.makeRDD(1 to numTasks, numTasks).count
       val end = System.currentTimeMillis()
@@ -47,7 +38,6 @@ class SchedulerThroughputTest(sc: SparkContext) extends PerfTest {
       Thread.sleep(interTrialWait * 1000)
       ("time" -> time) : JValue
     }
-
-    (options, results)
+    results
   }
 }

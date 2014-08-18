@@ -60,12 +60,17 @@ class PerfTestSuite(object):
         process = Popen(cmd, shell=True, env=test_env, stdout=PIPE, bufsize=1)
         # The first line of output should be JSON describing the actual configuration / environment
         # that was used (e.g. the SparkConf, System.properties, etc.)
-        actual_test_env = json.loads(process.stdout.readline())
-        logger.debug("Test environment:\n%s" % pprint.pformat(actual_test_env))
+        actual_test_env_str = process.stdout.readline()
+        logger.debug("Got test environment string %s" % actual_test_env_str)
+        actual_test_env = json.loads(actual_test_env_str)
+        logger.info("Test environment:\n%s" % pprint.pformat(actual_test_env))
         # Each of the subsequent lines should be a JSON dict containing a test result:
-        for result_line in process.stdout.readlines():
-            result = json.load(result_line)
-            logger.debug("Result:\n%s" % pprint.pformat(actual_test_env))
+        while process.poll() is None:
+            result_line = process.stdout.readline()
+            if result_line.strip() != "":
+                result = json.loads(result_line)
+                logger.debug("Got result string %s" % result)
+                logger.info("Result:\n%s" % pprint.pformat(result))
         process.wait()
 
         result_string = cls.process_output(config, test_dict['name'], test_flags,
@@ -98,10 +103,10 @@ class JVMPerfTestSuite(PerfTestSuite):
     def get_spark_submit_cmd(cls, cluster, main_class_or_script, opt_list, stdout_filename,
                              stderr_filename):
         spark_submit = "%s/bin/spark-submit" % cluster.spark_home
-        cmd = "%s --class %s --master %s --driver-memory %s %s %s 1>> %s 2>> %s" % (
+        cmd = "%s --class %s --master %s --driver-memory %s %s %s  2>> %s | tee -a %s" % (
             spark_submit, main_class_or_script, cluster.url,
             cluster.driver_memory, cls.test_jar_path, " ".join(opt_list),
-            stdout_filename, stderr_filename)
+            stderr_filename, stdout_filename)
         return cmd
 
 

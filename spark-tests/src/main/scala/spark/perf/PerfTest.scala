@@ -10,29 +10,10 @@ trait PerfTest {
   def createInputData()
 
   /**
-   * Runs the test and returns a JSON object that captures performance metrics, such as time taken,
-   * and values of any parameters.
+   * Runs the test and returns a JSON object that captures performance metrics, such as time taken
+   * or training accuracy.
    *
-   * The rendered JSON will look like this (except it will be minified):
-   *
-   *    {
-   *       "options": {
-   *         "num-partitions": "10",
-   *         "unique-values": "10",
-   *         ...
-   *       },
-   *       "results": [
-   *         {
-   *           "time": 0.211
-   *         },
-   *         {
-   *           "time": 0.112
-   *         }
-   *         ...
-   *       ]
-   *     }
-   *
-   * @return (options, list of per-run metrics (e.g. ("time" -> time))
+   * @return A sequence of JSON results containing per-run metrics (e.g. ("time" -> time))
    */
-  def run(): (JValue, Seq[JValue])
+  def run(): Seq[JValue]
 }

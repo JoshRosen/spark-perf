@@ -32,13 +32,15 @@ object TestRunner {
     }
     test.initialize(perfTestArgs)
     test.createInputData()
-    val (options, results) = test.run()
-    val json: JValue =
-      ("options" -> options) ~
-      ("sparkConf" -> sc.getConf.getAll.toMap) ~
-      ("sparkVersion" -> sc.version) ~
-      ("systemProperties" -> System.getProperties.asScala.toMap) ~
-      ("results" -> results)
-    println("results: " + compact(render(json)))
+    // Write a JSON object containing the true configuration settings:
+    val trueConf: JValue =
+        ("sparkConf" -> sc.getConf.getAll.toMap) ~
+        ("sparkVersion" -> sc.version) ~
+        ("systemProperties" -> System.getProperties.asScala.toMap)
+    println(compact(render(trueConf)))
+    val resultsStream = test.run()
+    resultsStream.foreach { result =>
+      println(compact(render(result)))
+    }
   }
 }

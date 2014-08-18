@@ -1,6 +1,5 @@
 package spark.perf
 
-import scala.collection.JavaConverters._
 import joptsimple.{OptionSet, OptionParser}
 
 import org.apache.spark.SparkContext
@@ -31,12 +30,11 @@ abstract class KVDataTest(sc: SparkContext, dataType: String = "string") extends
   val PERSISTENCE_TYPE = ("persistent-type", "input persistence (memory, disk, hdfs)")
   val STORAGE_LOCATION = ("storage-location", "directory used for storage with 'hdfs' persistence type")
   val HASH_RECORDS =     ("hash-records", "Use hashes instead of padded numbers for keys and values")
-  val WAIT_FOR_EXIT =    ("wait-for-exit", "JVM will not exit until input is received from stdin")
 
   val intOptions = Seq(NUM_TRIALS, INTER_TRIAL_WAIT, REDUCE_TASKS, KEY_LENGTH, VALUE_LENGTH, UNIQUE_KEYS,
     UNIQUE_VALUES, NUM_RECORDS, NUM_PARTITIONS, RANDOM_SEED)
   val stringOptions = Seq(PERSISTENCE_TYPE, STORAGE_LOCATION)
-  val booleanOptions = Seq(WAIT_FOR_EXIT, HASH_RECORDS)
+  val booleanOptions = Seq(HASH_RECORDS)
   val options = intOptions ++ stringOptions  ++ booleanOptions
 
   val parser = new OptionParser()
@@ -53,12 +51,10 @@ abstract class KVDataTest(sc: SparkContext, dataType: String = "string") extends
     parser.accepts(opt, desc).withRequiredArg().ofType(classOf[String]).required()
   }
 
-  var waitForExit = false
   var hashRecords = false
 
   override def initialize(args: Array[String]) = {
     optionSet = parser.parse(args.toSeq: _*)
-    waitForExit = optionSet.valueOf(WAIT_FOR_EXIT._1).asInstanceOf[String].toLowerCase == "true"
     hashRecords = optionSet.valueOf(HASH_RECORDS._1).asInstanceOf[String].toLowerCase == "true"
   }
 
@@ -96,20 +92,12 @@ abstract class KVDataTest(sc: SparkContext, dataType: String = "string") extends
     }
   }
 
-  override def run(): (JValue, Seq[JValue]) = {
+  override def run(): Seq[JValue] = {
     val numTrials = optionSet.valueOf(NUM_TRIALS._1).asInstanceOf[Int]
     val interTrialWait: Int = optionSet.valueOf(INTER_TRIAL_WAIT._1).asInstanceOf[Int]
     val reduceTasks = optionSet.valueOf(REDUCE_TASKS._1).asInstanceOf[Int]
 
-    val options: Map[String, String] = optionSet.asMap().asScala.flatMap { case (spec, values) =>
-      if (spec.options().size() == 1 && values.size() == 1) {
-        Some((spec.options().iterator().next(), values.iterator().next().toString))
-      } else {
-        None
-      }
-    }.toMap
-
-    val results: Seq[JValue] = (1 to numTrials).map { t =>
+    val results: Seq[JValue] = (1 to numTrials).view.map { t =>
       val start = System.currentTimeMillis()
       runTest(rdd, reduceTasks)
       val end = System.currentTimeMillis()
@@ -118,12 +106,7 @@ abstract class KVDataTest(sc: SparkContext, dataType: String = "string") extends
       Thread.sleep(interTrialWait * 1000)
       "time" -> time : JValue
     }
-
-    if (waitForExit) {
-      System.err.println("Test is finished. To exit JVM and continue, press Enter:")
-      readLine()
-    }
-    (options, results)
+    results
   }
 }
 
