@@ -1,4 +1,6 @@
-"""Types used in configuration module for Spark's performance tests."""
+"""
+Types used in configuration module for Spark's performance tests.
+"""
 
 
 class OptionSet(object):
@@ -30,8 +32,10 @@ class JavaOptionSet(OptionSet):
     def __init__(self, name, vals, can_scale=False):
         OptionSet.__init__(self, name, vals, can_scale)
 
-    def to_array(self, scale_factor = 1.0):
-        """Return array of strings each representing a Java option name/value pair."""
+    def to_array(self, scale_factor=1.0):
+        """
+        Return array of strings each representing a Java option name/value pair.
+        """
         return ["-D%s=%s" % (self.name, val) for val in self.scaled_vals(scale_factor)]
 
 # Represents a flag-style option and a set of values that

@@ -1,12 +1,11 @@
 import time
-import os
 
 
 class TestRunner(object):
     def __init__(self):
         pass
 
-    def run(self, plan, config, cluster):
+    def run(self, plan, config, cluster, results_dir):
         # A cluster might be running from an earlier test, so try shutting it down:
         cluster.stop()
         # Ensure all shutdowns have completed (no executors are running).
@@ -27,6 +26,5 @@ class TestRunner(object):
             if not suite.is_built():
                 suite.build()
             assert suite.is_built()
-            #os.makedirs("testresults")
             from sparkperf.testsuites import SparkTests
-            SparkTests.run_test(config, cluster, test, "testresults")
+            SparkTests.run_test(config, cluster, test, results_dir)

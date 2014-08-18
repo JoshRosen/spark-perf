@@ -1,9 +1,43 @@
 import os
-from sparkperf.commands import run_cmd, SBT_CMD
+from subprocess import check_output
+from sparkperf.commands import run_cmd, SBT_CMD, cd
+from sparkperf.cluster import Cluster
+import logging
+
+logger = logging.getLogger("sparkperf.build")
 
 
-def build_spark(commit_id, target_dir, conf_dir, merge_commit_into_master=False,
-                spark_git_repo="https://github.com/apache/spark.git"):
+def clone_spark(target_dir, spark_git_repo):
+    # Assumes that the preexisting 'spark' directory is valid.
+    if not os.path.isdir(target_dir):
+        logger.info("Git cloning Spark from %s" % spark_git_repo)
+        run_cmd("git clone %s %s" % (spark_git_repo, target_dir))
+        # Allow PRs and tags to be fetched:
+        run_cmd(("cd %s; git config --add remote.origin.fetch "
+                 "'+refs/pull/*/head:refs/remotes/origin/pr/*'") % target_dir)
+        run_cmd(("cd %s; git config --add remote.origin.fetch "
+                 "'+refs/tags/*:refs/remotes/origin/tag/*'") % target_dir)
+
+
+def checkout_version(repo_dir, commit_id, merge_commit_into_master=False):
+    with cd(repo_dir):
+        # Fetch updates
+        logger.info("Updating Spark repo...")
+        run_cmd("git fetch")
+
+        # Build Spark
+        logger.info("Cleaning Spark and checking out branch %s." % commit_id)
+        run_cmd("git clean -f -d -x")
+
+        if merge_commit_into_master:
+            run_cmd("git reset --hard master")
+            run_cmd("git merge %s -m ='Merging %s into master.'" %
+                    (commit_id, commit_id))
+        else:
+            run_cmd("git reset --hard %s" % commit_id)
+
+
+def build_spark(commit_id, target_dir, spark_git_repo, merge_commit_into_master=False):
     """
     Download and build Spark.
 
@@ -21,41 +55,53 @@ def build_spark(commit_id, target_dir, conf_dir, merge_commit_into_master=False,
     """
     # Assumes that the preexisting 'spark' directory is valid.
     if not os.path.isdir(target_dir):
-        print("Git cloning Spark from %s" % spark_git_repo)
-        run_cmd("git clone %s %s" % (spark_git_repo, target_dir))
-        # Allow PRs and tags to be fetched:
-        run_cmd(("cd %s; git config --add remote.origin.fetch "
-                "'+refs/pull/*/head:refs/remotes/origin/pr/*'") % target_dir)
-        run_cmd(("cd %s; git config --add remote.origin.fetch "
-                "'+refs/tags/*:refs/remotes/origin/tag/*'") % target_dir)
-    old_wd = os.getcwd()
-    os.chdir(target_dir)
-    try:
-        # Fetch updates
-        print("Updating Spark repo...")
-        run_cmd("git fetch")
-
-        # Build Spark
-        print("Cleaning Spark and building branch %s. This may take a while...\n" %
-              commit_id)
-        run_cmd("git clean -f -d -x")
-
-        if merge_commit_into_master:
-            run_cmd("git reset --hard master")
-            run_cmd("git merge %s -m ='Merging %s into master.'" %
-                    (commit_id, commit_id))
-        else:
-            run_cmd("git reset --hard %s" % commit_id)
-
+        clone_spark(target_dir, spark_git_repo)
+    checkout_version(target_dir, commit_id, merge_commit_into_master)
+    with cd(target_dir):
+        logger.info("Building spark at version %s; This may take a while...\n" % commit_id)
         run_cmd("%s clean assembly/assembly" % SBT_CMD)
 
-        # Copy Spark configuration files to new directory.
-        print("Copying all files from %s to %s/conf/" % (conf_dir, target_dir))
-        assert os.path.exists("%s/spark-env.sh" % conf_dir), \
-            "Could not find required file %s/spark-env.sh" % conf_dir
-        assert os.path.exists("%s/slaves" % conf_dir), \
-            "Could not find required file %s/slaves" % conf_dir
-        run_cmd("cp %s/* %s/conf/" % (conf_dir, target_dir))
-    finally:
-        os.chdir(old_wd)
 
+def copy_configuration(conf_dir, target_dir):
+    # Copy Spark configuration files to new directory.
+    logger.info("Copying all files from %s to %s/conf/" % (conf_dir, target_dir))
+    assert os.path.exists("%s/spark-env.sh" % conf_dir), \
+        "Could not find required file %s/spark-env.sh" % conf_dir
+    assert os.path.exists("%s/slaves" % conf_dir), \
+        "Could not find required file %s/slaves" % conf_dir
+    run_cmd("cp %s/* %s/conf/" % (conf_dir, target_dir))
+
+
+class SparkBuildManager(object):
+    """
+    Manages a collection of Spark builds, using cached builds (if available) or by
+    fetching and building Spark.
+    """
+    def __init__(self, root_dir, spark_git_repo="https://github.com/apache/spark.git"):
+        self.root_dir = root_dir
+        self.spark_git_repo = spark_git_repo
+        self._master_spark = os.path.join(self.root_dir, "master")
+        if not os.path.isdir(root_dir):
+            os.makedirs(root_dir)
+
+    def get_cluster(self, commit_id, cluster_url, driver_memory, conf_dir):
+        if not os.path.isdir(self._master_spark):
+            clone_spark(self._master_spark, self.spark_git_repo)
+        # Get the SHA corresponding to the commit and check if we've already built this version:
+        checkout_version(self._master_spark, commit_id)
+        sha = check_output("cd %s; git rev-parse --verify HEAD" % self._master_spark, shell=True)
+        sha = sha.strip()
+        logger.debug("Requested version %s corresponds to SHA %s" % (commit_id, sha))
+        cluster_dir = os.path.join(self.root_dir, sha)
+        # TODO: detect and recover from failed builds?
+        logger.debug("Searching for dir %s" % cluster_dir)
+        if os.path.exists(cluster_dir):
+            logger.info("Found pre-compiled Spark with SHA %s; skipping build" % sha)
+        else:
+            logger.info("Could not find pre-compiled Spark with SHA %s" % sha)
+            # Check out and build the requested version of Spark in the master spark directory
+            build_spark(commit_id, self._master_spark, self.spark_git_repo)
+            # Copy the completed build to a directory named after the SHA.
+            run_cmd("cp -r %s %s" % (self._master_spark, cluster_dir))
+        copy_configuration(conf_dir, cluster_dir)
+        return Cluster(cluster_dir, cluster_url, driver_memory, os.path.join(cluster_dir, "conf"))

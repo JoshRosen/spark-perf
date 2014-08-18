@@ -11,7 +11,7 @@ class TestPlan(object):
     def __init__(self):
         self.tests = []
 
-    def add_test(self, name, test_suite, test_script, java_opts, test_opts, scale_factor=1.0):
+    def add(self, name, test_suite, test_script, java_opts, test_opts, scale_factor=1.0):
         if not isinstance(java_opts, dict):
             java_opts = dict(itertools.chain.from_iterable(d.iteritems() for d in java_opts))
         if not isinstance(test_opts, dict):
