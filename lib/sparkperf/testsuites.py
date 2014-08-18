@@ -1,6 +1,9 @@
 import os
 from subprocess import Popen, PIPE
 import sys
+import logging
+import json
+import pprint
 
 from sparkperf import PROJ_DIR
 from sparkperf.commands import run_cmd, SBT_CMD
@@ -9,6 +12,9 @@ from sparkperf.config_utils import test_opt_to_flags, java_opt_to_flags
 
 
 test_env = os.environ.copy()
+
+
+logger = logging.getLogger("sparkperf")
 
 
 class PerfTestSuite(object):
@@ -36,8 +42,7 @@ class PerfTestSuite(object):
         """
         Run an individual test from this performance suite.
         """
-        print(OUTPUT_DIVIDER_STRING)
-        print("Running test command: '%s' ..." % test_dict["test-script"])
+        logger.info("Running test command: '%s' ..." % test_dict["test-script"])
         stdout_filename = "%s/%s.out" % (log_directory, test_dict["name"])
         stderr_filename = "%s/%s.err" % (log_directory, test_dict["name"])
         output_filename = "%s/test-output" % log_directory
@@ -51,13 +56,21 @@ class PerfTestSuite(object):
         test_env["SPARK_SUBMIT_OPTS"] = " ".join(java_flags)
         cmd = cls.get_spark_submit_cmd(cluster, test_dict['test-script'], test_flags,
                                        stdout_filename, stderr_filename)
-        print("\nRunning command: %s\n" % cmd)
-        Popen(cmd, shell=True, env=test_env).wait()
+        logger.info("\nRunning command: %s\n" % cmd)
+        process = Popen(cmd, shell=True, env=test_env, stdout=PIPE, bufsize=1)
+        # The first line of output should be JSON describing the actual configuration / environment
+        # that was used (e.g. the SparkConf, System.properties, etc.)
+        actual_test_env = json.loads(process.stdout.readline())
+        logger.debug("Test environment:\n%s" % pprint.pformat(actual_test_env))
+        # Each of the subsequent lines should be a JSON dict containing a test result:
+        for result_line in process.stdout.readlines():
+            result = json.load(result_line)
+            logger.debug("Result:\n%s" % pprint.pformat(actual_test_env))
+        process.wait()
+
         result_string = cls.process_output(config, test_dict['name'], test_flags,
                                            stdout_filename, stderr_filename)
-        print(OUTPUT_DIVIDER_STRING)
-        print("\nResult: " + result_string)
-        print(OUTPUT_DIVIDER_STRING)
+        logger.info("\nResult: " + result_string)
         if "FAILED" in result_string:
             raise Exception("Test Failed!")
         with open(output_filename, 'wa') as out_file:

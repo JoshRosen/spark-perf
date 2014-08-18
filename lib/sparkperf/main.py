@@ -2,17 +2,13 @@
 
 import argparse
 import imp
-import socket
-from subprocess import check_output
+import logging
 
-from sparkperf.commands import *
 from sparkperf.cluster import Cluster
 from sparkperf.testsuites import *
 from sparkperf.build_spark import SparkBuildManager
-from sparkperf.test_plan import TestPlan
 from sparkperf.test_runner import TestRunner
 
-import logging
 logger = logging.getLogger("sparkperf")
 
 
